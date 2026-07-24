@@ -43,7 +43,7 @@ class QDrantDB(VectorDBInterface):
     
     async def get_collection_info(self, collection_name:str):
         if await self.is_collection_exists(collection_name):
-            collection = await self.client.get_collection(collection_name=collection_name)
+            collection = self.client.get_collection(collection_name=collection_name)
             collection = json.dumps(collection, default= lambda o: o.__dict__)
             return json.loads(collection)
         else:
@@ -136,7 +136,7 @@ class QDrantDB(VectorDBInterface):
             return False
         
     async def search_collection_by_vector(self, collection_name:str , vector:list , limit:int = 10):
-        result = await self.client.query_points(
+        result = self.client.query_points(
             collection_name=collection_name,
             query=vector,
             limit=limit
