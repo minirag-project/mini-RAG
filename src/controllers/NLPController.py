@@ -1,6 +1,10 @@
 from .BaseController import BaseController
 from models.db_schemas import Project , DataChunk 
 from stores.LLM.LLMEnums import DocumentTypeEnums
+from typing import List
+import logging
+
+
 
 class NLPController(BaseController):
 
@@ -11,42 +15,43 @@ class NLPController(BaseController):
         self.embedding_client = embedding_client
         self.template_parser = template_parser
 
+        self.logger = logging.getLogger('uvicorn')
+
     def create_collection_name(self, project_id: str):
-        return f"collection_{project_id}"
+        return f"collection_{self.vector_db_client.default_vector_size}_{project_id}"
     
-    def reset_vector_db_collection(self, project : Project):
+    async def reset_vector_db_collection(self, project : Project):
         collection_name = self.create_collection_name(project_id=project.project_id)
-        return self.vector_db_client.delete_collection(collection_name = collection_name)
+        return await self.vector_db_client.delete_collection(collection_name = collection_name)
     
-    def get_vector_db_collection(self, project : Project):
+    async def get_vector_db_collection(self, project : Project):
         collection_name = self.create_collection_name(project_id=project.project_id)
-        collection_info = self.vector_db_client.get_collection_info(collection_name = collection_name)
+        collection_info = await self.vector_db_client.get_collection_info(collection_name = collection_name)
         return collection_info
     
-    def index_into_vector_db(self, project : Project, data_chunks : list[DataChunk] , do_reset : bool = False , chunks_ids : list[int] = None):
+    async def index_into_vector_db(self, project : Project, data_chunks : List[DataChunk] , do_reset : bool = False , chunks_ids : List[int] = None):
 
         collection_name = self.create_collection_name(project_id=project.project_id)
 
         texts = [chunk.chunk_text for chunk in data_chunks]
         metadatas = [chunk.chunk_metadata for chunk in data_chunks]
 
-        vectors = [
-            self.embedding_client.generate_embedding(text = text , document_type = DocumentTypeEnums.RETRIEVAL_DOCUMENT.value)
-            for text in texts
-        ]
+        vectors =  self.embedding_client.generate_embedding(texts = texts , document_type = DocumentTypeEnums.RETRIEVAL_DOCUMENT.value)
 
-        self.vector_db_client.create_collection(collection_name=collection_name, embedding_size=self.embedding_client.embedding_size, do_reset=False)
+        print(f"Indexing {len(vectors)} vectors into collection: {collection_name}")
 
-        self.vector_db_client.insert_collection_batch(collection_name=collection_name, vectors=vectors, texts=texts, metadatas=metadatas, record_ids=chunks_ids)
+        await self.vector_db_client.create_collection(collection_name=collection_name, embedding_size=self.embedding_client.embedding_size, do_reset=do_reset)
+
+        await self.vector_db_client.insert_collection_batch(collection_name=collection_name, vectors=vectors, texts=texts, metadatas=metadatas, record_ids=chunks_ids)
 
         return True
         
 
-    def search_vector_db(self, project : Project, query_text : str, limit : int = 10):
+    async def search_vector_db(self, project : Project, query_text : str, limit : int = 10):
         collection_name = self.create_collection_name(project_id=project.project_id)
 
         embedding_vector = self.embedding_client.generate_embedding(
-            text=query_text,
+            texts=query_text,
             document_type=DocumentTypeEnums.RETRIEVAL_QUERY.value
         )
 
@@ -54,17 +59,17 @@ class NLPController(BaseController):
             self.logger.error("Failed to generate embedding for the query text.")
             return False
 
-        search_results = self.vector_db_client.search_collection_by_vector(
+        search_results = await self.vector_db_client.search_collection_by_vector(
             collection_name=collection_name,
             vector=embedding_vector,
             limit=limit
         )
 
         return search_results
-    
-    def generate_response(self, project : Project , query : str , limit : int = 10):
+
+    async def generate_response(self, project : Project , query : str , limit : int = 10):
         answer , full_prompt , chat_history = None , None , None
-        search_results = self.search_vector_db(project=project, query_text=query, limit=limit)
+        search_results = await self.search_vector_db(project=project, query_text=query, limit=limit)
 
         if not search_results or len(search_results) == 0:
             self.logger.error("No search results found.")

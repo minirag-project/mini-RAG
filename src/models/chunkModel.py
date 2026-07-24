@@ -55,10 +55,18 @@ class ChunkModel(DataBaseModel):
 
         return result.rowcount
     
-    async def get_data_chunks_by_project_id(self, project_id: int, page: int = 1, page_size: int = 10):
+    async def get_data_chunks_by_project_id(self, project_id: int, page: int = 1, page_size: int = 50):
         async with self.connection() as session:
             async with session.begin():
                 query = select(DataChunk).where(DataChunk.chunk_project_id == project_id).offset((page - 1) * page_size).limit(page_size)
                 result = await session.execute(query)
                 chunks = result.scalars().all()
         return chunks
+
+    async def get_total_chunks_count_by_project_id(self, project_id: int):
+        async with self.connection() as session:
+            async with session.begin():
+                query = select(func.count(DataChunk.chunk_id)).where(DataChunk.chunk_project_id == project_id)
+                result = await session.execute(query)
+                total_count = result.scalar_one()
+        return total_count

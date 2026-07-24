@@ -3,6 +3,7 @@ from google import genai
 from google.genai import types
 import logging
 from ..LLMEnums import GeminiEnums
+from typing import List , Union
 
 class Gemini_provider(LLMInterface):
     def __init__(self, api_key: str, default_input_max_tokens: int = 1000, default_output_max_tokens: int = 1000, default_temperature: float = 0.1):
@@ -74,36 +75,46 @@ class Gemini_provider(LLMInterface):
             self.logger.error(f"Error during Gemini generation: {e}")
             return None
 
-    def generate_embedding(self, text: str, document_type: str = None):
+    def generate_embedding(self, texts: Union[str, List[str]], document_type: str = None):
+        #current gemini embedding model doesn't support batch embedding, so we will loop through the list of texts and get embeddings one by one
         if not self.client:
-            self.logger.error("Gemini client is not initialized.")
+            self.logger.error("Gemini client was not set")
             return None
-        
+
+        is_single = False
+
+        if isinstance(texts, str):
+            is_single = True
+            texts = [texts]
+
         if not self.embedding_model_id:
-            self.logger.error("Embedding model ID is not set.")
+            self.logger.error("Embedding model for Gemini was not set")
             return None
-        
-        config = None
+
         if document_type:
-            config = types.EmbedContentConfig(task_type=document_type , output_dimensionality=768)
-
-        try:
-            response = self.client.models.embed_content(
-                model=self.embedding_model_id,
-                contents=text,
-                config=config
+            config = types.EmbedContentConfig(
+            task_type=document_type,
+            output_dimensionality=self.embedding_size,
             )
-            
-            if not response or not response.embeddings:
-                self.logger.error("No embedding data returned from Gemini.")
-                return None
-                
-            return response.embeddings[0].values
+        else:
+            config = None
 
-        except Exception as e:
-            self.logger.error(f"Error during Gemini embedding generation: {e}")
-            return None
+        vectors = []  
+        for t in texts:
+            result = self.client.models.embed_content(   
+                model=self.embedding_model_id,
+                contents=t,
+                config=config,
+            )
+            if result and result.embeddings:
+                vectors.append([float(v) for v in result.embeddings[0].values])
+            else:
+                self.logger.error(f"Embedding failed for text: {t[:50]}...")
+                vectors.append(None)
 
+        return vectors[0] if is_single else vectors
+
+    
     def construct_prompt(self, prompt: str, role: str):
         return types.Content(
             role=role,

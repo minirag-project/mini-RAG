@@ -2,8 +2,15 @@ from .BaseController import BaseController
 from .ProjectController import ProjectController
 import os
 from langchain_community.document_loaders import PyMuPDFLoader , TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from models import ProcessEnums
+from dataclasses import dataclass
+from typing import List
+
+@dataclass
+class document:
+    page_content: str
+    metadata: dict
+
 
 class ProcessController(BaseController):
     def __init__(self,project_id:str):
@@ -25,7 +32,10 @@ class ProcessController(BaseController):
         if file_extension == ProcessEnums.PDF.value:
             return PyMuPDFLoader(file_path)
         elif file_extension == ProcessEnums.TXT.value:
-            return TextLoader(file_path)
+            return TextLoader(
+                        file_path,
+                        encoding="utf-8"
+                    )
         else:
             raise ValueError(f"Unsupported file type: {file_extension}")
         
@@ -38,10 +48,6 @@ class ProcessController(BaseController):
 
     def process_file_content(self, file_content: list, file_id:str,
                             chunk_size: int = 100, chunk_overlap: int = 20):
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            length_function=len)
         
         file_content_texts = [
             rec.page_content
@@ -52,9 +58,58 @@ class ProcessController(BaseController):
             for rec in file_content
         ]
 
-        chunks = text_splitter.create_documents(
+        chunks = self.process_simple_splitter(
             file_content_texts,
-            metadatas=file_metadata)
-        
+            file_metadata,
+            chunk_size=chunk_size
+        )
 
         return chunks
+
+    def process_simple_splitter(self, chunks: List[str], metadatas: List[dict],
+                                chunk_size: int = 100, splitter_tag: str = "\n"):
+
+        line_meta_pairs = []
+        for text, meta in zip(chunks, metadatas):
+            for line in text.split(splitter_tag):
+                line = line.strip()
+                if line:
+                    line_meta_pairs.append((line, meta))
+
+        result_chunks = []
+        current_chunk = ""
+        current_metadatas = []
+
+        for line, meta in line_meta_pairs:
+            current_chunk += line + splitter_tag
+            current_metadatas.append(meta)
+
+            if len(current_chunk) >= chunk_size:
+                result_chunks.append(
+                    document(
+                        page_content=current_chunk.strip(),
+                        metadata=self._merge_metadata(current_metadatas)
+                    )
+                )
+                current_chunk = ""
+                current_metadatas = []
+
+        if current_chunk:
+            result_chunks.append(
+                document(
+                    page_content=current_chunk.strip(),
+                    metadata=self._merge_metadata(current_metadatas)
+                )
+            )
+
+        return result_chunks
+
+    def _merge_metadata(self, metadatas: List[dict]) -> dict:
+        if not metadatas:
+            return {}
+        merged = dict(metadatas[0])
+        pages = [m.get("page") for m in metadatas if m.get("page") is not None]
+        if pages:
+            merged["page_start"] = min(pages)
+            merged["page_end"] = max(pages)
+        return merged

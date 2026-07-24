@@ -25,17 +25,17 @@ async def lifespan(app: FastAPI):
     app.state.embedding_client = llm_factory.create_provider(settings.EMBEDDING_BACKEND)
     app.state.embedding_client.set_embedding(settings.EMBEDDING_MODEL_ID, settings.EMBEDDING_MODEL_SIZE)
 
-    vector_db_factory = VectorDBFactory(config=settings)
+    vector_db_factory = VectorDBFactory(config=settings , db_client=app.state.db_client)
 
     app.state.vector_db_client = vector_db_factory.create_vector_db(settings.VECTOR_DB_BACKEND)
-    app.state.vector_db_client.connect()
+    await app.state.vector_db_client.connect()
 
     app.state.template_parser = template_parser(language=settings.DEFAULT_LANGUAGE)
 
 
     yield
     await app.state.db_engine.dispose()
-    app.state.vector_db_client.disconnect()
+    await app.state.vector_db_client.disconnect()
 
 
 app = FastAPI(lifespan=lifespan)

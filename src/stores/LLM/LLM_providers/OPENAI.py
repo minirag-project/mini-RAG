@@ -2,6 +2,7 @@ from ..LLMinterface import LLMInterface
 from openai import OpenAI
 import logging
 from ..LLMEnums import OpenAIEnums
+from typing import List , Union
 
 class OPENAI_provider(LLMInterface):
     def __init__(self,api_key:str , api_url : str = None,
@@ -63,7 +64,10 @@ class OPENAI_provider(LLMInterface):
             return None
         return response.choices[0].message['content']
 
-    def generate_embedding(self, text:str , document_type:str = None):
+    def generate_embedding(self, text:Union[str, List[str]] , document_type:str = None):
+        if isinstance(text, str):
+            text = [text]
+
         if not self.client:
             self.logger.error("OpenAI client is not initialized.")
             return None
@@ -80,7 +84,8 @@ class OPENAI_provider(LLMInterface):
         if not response or not response.data or len(response.data) == 0 or not response.data[0].embedding:
             self.logger.error("No embedding data returned from OpenAI.")
             return None
-        return response.data[0].embedding
+        
+        return [data.embedding for data in response.data]
 
 
     def construct_prompt(self, prompt:str, role:str):

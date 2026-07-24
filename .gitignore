@@ -1,6 +1,6 @@
 # Virtual environments
 venv/
-mini_rag/
+mini-RAG/
 .env/
 
 # Python cache
