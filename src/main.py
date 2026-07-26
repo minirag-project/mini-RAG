@@ -7,11 +7,14 @@ from stores.VectorDB.VectorDBFactory import VectorDBFactory
 from stores.LLM.templates.templates_parser import template_parser
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+from utils.metrics import setup_prometheus
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+
+    setup_prometheus(app)
 
     postgres_url = f"postgresql+asyncpg://{settings.POSTGRES_USERNAME}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
     app.state.db_engine = create_async_engine(postgres_url)
