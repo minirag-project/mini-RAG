@@ -14,8 +14,6 @@ from utils.metrics import setup_prometheus
 async def lifespan(app: FastAPI):
     settings = get_settings()
 
-    setup_prometheus(app)
-
     postgres_url = f"postgresql+asyncpg://{settings.POSTGRES_USERNAME}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
     app.state.db_engine = create_async_engine(postgres_url)
     app.state.db_client = sessionmaker(app.state.db_engine, class_=AsyncSession, expire_on_commit=False)
@@ -42,6 +40,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+setup_prometheus(app)
 
 app.include_router(base_router)
 app.include_router(data_router)

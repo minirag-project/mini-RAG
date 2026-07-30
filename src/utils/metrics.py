@@ -17,11 +17,11 @@ class prometheusMiddleware(BaseHTTPMiddleware):
 
         return response
 
-    def setup_prometheus(self, app: FastAPI):
+def setup_prometheus(app: FastAPI):
 
-        app.add_middleware(prometheusMiddleware)
+    app.add_middleware(prometheusMiddleware)
 
-        @app.get("/ronaldo_is_the_real_goat_1210", include_in_schema=False)
-        async def metrics():
-            
-            return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+    @app.get("/ronaldo_is_the_real_goat_1210", include_in_schema=False)
+    async def metrics():
+        
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
