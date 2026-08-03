@@ -20,9 +20,9 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.SSH_DEVELOP_HOST_IP }}
+          host: ${{ secrets.SSH_MAIN_HOST_IP }}
           username: minirag
-          key: ${{ secrets.SSH_DEVELOP_PRIVATE_KEY }}
+          key: ${{ secrets.SSH_MAIN_PRIVATE_KEY }}
           script: |
             set -e  # Exit immediately if a command fails
             
