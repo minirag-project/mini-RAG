@@ -23,6 +23,7 @@ jobs:
           host: ${{ secrets.SSH_MAIN_HOST_IP }}
           username: minirag
           key: ${{ secrets.SSH_MAIN_PRIVATE_KEY }}
+          port: 43210
           script: |
             set -e  # Exit immediately if a command fails
             
