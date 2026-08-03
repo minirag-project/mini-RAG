@@ -6,55 +6,44 @@ on:
       - main
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted 
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_MAIN_HOST_IP }}
-          username: minirag
-          key: ${{ secrets.SSH_MAIN_PRIVATE_KEY }}
-          port: 43210
-          script: |
-            set -e  # Exit immediately if a command fails
-            
-            cd /home/minirag/workspace/mini-RAG
-            
-            # Fetch and ensure local branch matches remote 'main'
-            git fetch origin main
-            git checkout main
-            git reset --hard origin/main
-            
-            # Restart systemd service
-            sudo systemctl restart minirag.service
-            
-            echo "Waiting for service initialization..."
-            sleep 15
+      - name: Deploy mini-RAG
+        run: |
+          set -e
+          cd /home/minirag/workspace/mini-RAG
+          
+          # Sync local code with main branch
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+          
+          # Restart application
+          sudo systemctl restart minirag.service
+          
+          echo "Waiting for service initialization..."
+          sleep 15
 
-            # Health check loop
-            PORT_READY=0
-            for i in $(seq 1 6); do
-              if ss -tuln | grep -q ':80'; then
-                echo "✅ Port 80 is now active."
-                PORT_READY=1
-                break
-              fi
-              echo "⏳ Port 80 not ready yet (Attempt $i/6). Retrying in 5s..."
-              sleep 5
-            done
-
-            if [ $PORT_READY -eq 0 ]; then
-              echo "❌ Service failed to start on port 80"
-              # Print logs for easier debugging in GitHub Actions console
-              sudo journalctl -u minirag.service -n 50 --no-pager
-              exit 1
+          # Health check for port 80
+          PORT_READY=0
+          for i in $(seq 1 6); do
+            if ss -tuln | grep -q ':80'; then
+              echo "✅ Port 80 is active."
+              PORT_READY=1
+              break
             fi
+            echo "⏳ Waiting for port 80... (Attempt $i/6)"
+            sleep 5
+          done
+
+          if [ $PORT_READY -eq 0 ]; then
+            echo "❌ Service failed to start on port 80"
+            sudo journalctl -u minirag.service -n 50 --no-pager
+            exit 1
+          fi
