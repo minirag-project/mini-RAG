@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -20,26 +21,36 @@ jobs:
           username: minirag
           key: ${{ secrets.SSH_DEVELOP_PRIVATE_KEY }}
           script: |
+            set -e  # Exit immediately if a command fails
+            
             cd /home/minirag/workspace/mini-RAG
-            git checkout develop
-            git pull
+            
+            # Fetch and ensure local branch matches remote 'main'
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
+            
+            # Restart systemd service
             sudo systemctl restart minirag.service
-            echo "Waiting..."
-            sleep 20
+            
+            echo "Waiting for service initialization..."
+            sleep 15
 
-            for i in {1..6}; do
+            # Health check loop
+            PORT_READY=0
+            for i in $(seq 1 6); do
               if ss -tuln | grep -q ':80'; then
                 echo "✅ Port 80 is now active."
+                PORT_READY=1
                 break
-              else
-                echo "⏳ Port 80 not ready yet. Retrying in 5 seconds..."
-                sleep 5
               fi
+              echo "⏳ Port 80 not ready yet (Attempt $i/6). Retrying in 5s..."
+              sleep 5
             done
 
-            if ! ss -tuln | grep -q ':80'; then
+            if [ $PORT_READY -eq 0 ]; then
               echo "❌ Service failed to start on port 80"
+              # Print logs for easier debugging in GitHub Actions console
+              sudo journalctl -u minirag.service -n 50 --no-pager
               exit 1
             fi
-
-
