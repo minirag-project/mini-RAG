@@ -12,10 +12,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v4
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_DEVELOP_HOST_IP }}
           username: minirag
